@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: drone-dispatch-server
+
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/drone_dispatch?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+    username: app
+    password: ${DB_PASSWORD:SkyShow@2026}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 5000
+
+logging:
+  level:
+    root: info
