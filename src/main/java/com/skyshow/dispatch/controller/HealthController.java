@@ -1,6 +1,7 @@
 package com.skyshow.dispatch.controller;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.skyshow.dispatch.service.HealthService;
+import com.skyshow.dispatch.common.Result;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -11,20 +12,18 @@ import java.util.Map;
 @RestController
 public class HealthController {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final HealthService healthService;
 
-    public HealthController(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public HealthController(HealthService healthService) {
+        this.healthService = healthService;
     }
 
     @GetMapping("/api/health")
-    public Map<String, Object> health() {
-        Integer one = jdbcTemplate.queryForObject("SELECT 1", Integer.class);
-
+    public Result<Map<String, Object>> health() {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", "ok");
-        body.put("db", (one != null && one == 1) ? "connected" : "unknown");
+        body.put("db", healthService.databaseIsAlive() ? "connected" : "unknown");
         body.put("time", LocalDateTime.now().toString());
-        return body;
+        return Result.success(body);
     }
 }
