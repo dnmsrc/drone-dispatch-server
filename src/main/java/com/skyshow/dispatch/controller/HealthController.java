@@ -2,6 +2,7 @@ package com.skyshow.dispatch.controller;
 
 import com.skyshow.dispatch.service.HealthService;
 import com.skyshow.dispatch.common.Result;
+import com.skyshow.dispatch.common.BizException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,5 +26,10 @@ public class HealthController {
         body.put("db", healthService.databaseIsAlive() ? "connected" : "unknown");
         body.put("time", LocalDateTime.now().toString());
         return Result.success(body);
+    }
+
+    @GetMapping("/api/demo/error")
+    public Result<Void> demoError() {
+        throw new BizException(400, "演示：这是一个业务异常");
     }
 }
