@@ -30,6 +30,9 @@ application-local.*
 uploads/
 data/
 
+# ── 架构图工具本地产物（正式交付物在 docs/er-diagram.html）──
+.archify/
+
 # ── 编辑器 / 系统 ─────────────────────────────
 .idea/
 .vscode/*
