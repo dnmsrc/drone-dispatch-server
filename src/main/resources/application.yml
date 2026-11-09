@@ -38,3 +38,21 @@ app:
     allow-credentials: true
     # 预检缓存 1 小时，减少 OPTIONS 请求次数
     max-age: 3600
+
+  # ── JWT 登录令牌配置（JwtProperties 绑定）──
+  jwt:
+    # HS256 签名密钥，至少 32 字节。开发默认值仅本地用；
+    # 生产必须用环境变量 APP_JWT_SECRET 覆盖，真实密钥禁止提交进 Git
+    secret: ${APP_JWT_SECRET:dev-only-skyshow-drone-dispatch-jwt-secret-key-0123456789}
+    # token 有效期（分钟），默认 12 小时
+    expire-minutes: 720
+    # 前端携带 token 的请求头名
+    header: Authorization
+    # token 前缀（注意尾部空格），最终头形如：Authorization: Bearer xxx.yyy.zzz
+    token-prefix: "Bearer "
+
+  # ── 初始管理员（SecurityProperties 绑定，仅 admin_users 为空时初始化一次）──
+  security:
+    init-admin-enabled: true
+    init-admin-username: admin
+    init-admin-password: admin123
