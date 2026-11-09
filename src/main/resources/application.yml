@@ -17,3 +17,24 @@ spring:
 logging:
   level:
     root: info
+
+# ────────────────────────────────────────────────────────────
+# 跨域 CORS 白名单（由 CorsProperties 绑定、CorsWebConfig 消费）
+# 只放行可信前端来源；允许方法 / 请求头 / 暴露头在 CorsProperties 有默认值，
+# 需要覆盖时再在这里按同名 kebab-case 键追加即可。
+# 生产环境请改为真实域名（可放 application-prod.yml 或用环境变量覆盖），
+# 例如：APP_CORS_ALLOWED-ORIGINS 不适合多值，推荐用 application-prod.yml 维护清单。
+# ────────────────────────────────────────────────────────────
+app:
+  cors:
+    allowed-origins:
+      # 管理后台 web（Vite dev 端口 8091）。开发期虽走 /api 代理同源，仍放通以便直连调试
+      - "http://localhost:8091"
+      - "http://127.0.0.1:8091"
+      # 用户端 H5（uni-app/Vite 常用 dev 端口 5173，工程尚未建，先预留）
+      - "http://localhost:5173"
+      - "http://127.0.0.1:5173"
+    # 允许携带凭证（Cookie / Authorization），登录态必需
+    allow-credentials: true
+    # 预检缓存 1 小时，减少 OPTIONS 请求次数
+    max-age: 3600
