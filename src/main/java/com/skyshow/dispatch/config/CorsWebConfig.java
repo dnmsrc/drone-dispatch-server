@@ -17,13 +17,22 @@ import org.springframework.web.filter.CorsFilter;
  * 真正的业务请求根本发不出去。把 CorsFilter 注册为过滤器链最高优先级
  * （{@link Ordered#HIGHEST_PRECEDENCE}），可保证预检在任何鉴权 / 业务逻辑之前被处理。
  *
- * <p>当前后端所有接口都在 {@code /api} 前缀下，过滤器也只对该前缀生效。
+ * <p><b>两种路径规则不要混淆：</b>
+ * <ul>
+ *   <li>Servlet 容器的过滤器映射 {@code /api/*}：按 Servlet 规则匹配 /api 下<b>任意层级</b>；</li>
+ *   <li>Spring 内部 {@link UrlBasedCorsConfigurationSource} 用 Ant 风格匹配，
+ *       必须写 {@code /api/**}（{@code **} 跨多层），否则只能覆盖 /api/xxx 一层，
+ *       会漏掉 /api/auth/login 这类两级路径。</li>
+ * </ul>
  */
 @Configuration
 public class CorsWebConfig {
 
-    /** 后端统一接口前缀，CORS 过滤器只拦截这部分请求。 */
-    private static final String API_PATH = "/api/*";
+    /** Servlet 容器层过滤器映射：/api 下任意层级请求都会经过本过滤器。 */
+    private static final String SERVLET_API_PATTERN = "/api/*";
+
+    /** Spring Ant 路径匹配：/api/** 才能覆盖 /api/auth/me 等多层接口。 */
+    private static final String CORS_API_PATTERN = "/api/**";
 
     @Bean
     public FilterRegistrationBean<CorsFilter> corsFilterRegistration(CorsProperties props) {
@@ -38,13 +47,13 @@ public class CorsWebConfig {
         config.setMaxAge(props.getMaxAge());
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration(API_PATH, config);
+        source.registerCorsConfiguration(CORS_API_PATTERN, config);
 
         FilterRegistrationBean<CorsFilter> registration =
                 new FilterRegistrationBean<>(new CorsFilter(source));
         // 最高优先级：确保 OPTIONS 预检早于一切鉴权过滤器 / 拦截器执行
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
-        registration.addUrlPatterns(API_PATH);
+        registration.addUrlPatterns(SERVLET_API_PATTERN);
         registration.setName("corsFilter");
         return registration;
     }
