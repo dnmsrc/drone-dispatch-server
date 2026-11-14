@@ -43,3 +43,6 @@ Thumbs.db
 *.sw?
 *.bak
 *.orig
+
+# ── 内部设计文档（roadmap / ER 图 / 数据模型 / 面试手册 / AI 提示词等，仅留存本机，不开源）──
+/docs/

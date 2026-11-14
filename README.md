@@ -8,14 +8,13 @@
 
 ## 当前状态
 
-**技术栈已定**：Java 21（Microsoft OpenJDK）+ Maven 3.9.11 + Spring Boot + MySQL 8.4.10（本机环境见 `D:\environment\README.md`）。
+**技术栈**：Java 21（Microsoft OpenJDK）+ Maven 3.9.11 + Spring Boot + MySQL 8.4.10。
 
-**进度基准**：`docs/roadmap.md`（七阶段路线图 + 当前阶段 + 进度日志，每次推进后更新）。
-阶段 0（链路跑通）与阶段 2（最小骨架）已完成，当前处于**阶段 1 · 数据模型**：17 张表的 DDL 已在本地 MySQL 库 `drone_dispatch` 执行建表，ER 图见 `docs/er-diagram.html`、表结构见 `docs/数据模型.md`。
+阶段 0（链路跑通）与阶段 2（最小骨架）已完成，当前处于**阶段 1 · 数据模型**：17 张表的 DDL 已在本地 MySQL 库 `drone_dispatch` 执行建表，完整建表脚本见仓库内 `db/schema.sql`（内部路线图与 ER 图等设计文档不随仓库公开）。
 
 ## 本地运行
 
-前置：JDK 21、Maven 3.9+、MySQL 8.4（本机免安装环境见 `D:\environment\README.md`），已建库 `drone_dispatch` 与业务账号 `app`。数据库口令走环境变量 `DB_PASSWORD`（缺省值仅本地开发用），JWT 密钥走 `APP_JWT_SECRET`，均不硬编码进 Git。
+前置：JDK 21、Maven 3.9+、MySQL 8.4，已建库 `drone_dispatch` 与业务账号 `app`。数据库口令走环境变量 `DB_PASSWORD`（缺省值仅本地开发用），JWT 密钥走 `APP_JWT_SECRET`，均不硬编码进 Git。
 
 ```bash
 cd drone-dispatch-server
@@ -45,5 +44,4 @@ mvn -DskipTests compile      # 仅编译验证
 ## 与原型的关系
 
 `drone-dispatch-prototype/mock-server/server.js` 是当前唯一的 API 实现（61 个路由，JSON 文件持久化），
-接口契约见 `drone-dispatch-prototype/docs/PRD.md` §11 与 `drone-dispatch-prototype/docs/consult-workflow.md`。
-服务端第一步就是**把这套接口契约接过来**，保证 `drone-dispatch-web/`、`drone-dispatch-h5/` 指向真实服务端后行为不变。
+服务端第一步就是**把这套接口契约接过来**（以原型 mock-server 的路由实现与本仓 `controller` 层为准，内部 PRD 设计文档不随仓库公开），保证 `drone-dispatch-web/`、`drone-dispatch-h5/` 指向真实服务端后行为不变。
