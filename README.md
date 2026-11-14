@@ -1,10 +1,11 @@
 # drone-dispatch-server（服务端工程根目录）
 
-> 本目录是**独立 Git 仓库**（仓库名即目录名 `drone-dispatch-server`），提交记录与服务端相关，
-> 与顶层文档仓、`drone-dispatch-web`、`drone-dispatch-h5` 互不混杂。
+> 本目录是四个平级独立 Git 仓库之一（仓库名即目录名 `drone-dispatch-server`），提交记录与服务端相关，
+> 与 `drone-dispatch-prototype`、`drone-dispatch-web`、`drone-dispatch-h5` 三仓互不混杂。
+> 四仓总览与 GitHub 地址见 [`drone-dispatch-prototype` 的 README](https://github.com/dnmsrc/drone-dispatch-prototype#项目全貌与仓库分布)。
 
-本目录放置**所有服务端工程**（后端 API，以及将来可能的定时任务、支付回调网关等）。前端在仓库根目录的
-`drone-dispatch-web/`（管理后台）与 `drone-dispatch-h5/`（用户端 H5 / 小程序）。
+本目录放置**所有服务端工程**（后端 API，以及将来可能的定时任务、支付回调网关等）。前端在另外两个独立仓：
+[`drone-dispatch-web`](https://github.com/dnmsrc/drone-dispatch-web)（管理后台）与 [`drone-dispatch-h5`](https://github.com/dnmsrc/drone-dispatch-h5)（用户端 H5 / 小程序）。
 
 ## 当前状态
 
