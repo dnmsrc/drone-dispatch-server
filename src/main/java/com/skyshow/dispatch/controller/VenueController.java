@@ -1,9 +1,12 @@
 package com.skyshow.dispatch.controller;
 
 import com.skyshow.dispatch.common.Result;
+import com.skyshow.dispatch.dto.venue.VenueCreateRequest;
 import com.skyshow.dispatch.entity.Venue;
 import com.skyshow.dispatch.service.VenueService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,6 +27,13 @@ public class VenueController {
     @GetMapping
     public Result<List<Venue>> list() {
         return Result.success(venueService.listEnabledVenues());
+    }
+
+    /** 新增场地 */
+    @PostMapping
+    public Result<Void> create(@RequestBody VenueCreateRequest request) {
+        venueService.createVenue(request);
+        return Result.success(null);
     }
 
 }

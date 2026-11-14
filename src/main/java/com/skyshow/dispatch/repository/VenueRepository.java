@@ -43,4 +43,17 @@ public class VenueRepository {
                 + " FROM venues WHERE enabled = 1 AND deleted = 0 ORDER BY id";
         return jdbcTemplate.query(sql, VENUE_MAPPER);
     }
+
+    private static final String INSERT_COLUMNS = "name, address, lng, lat, enabled";
+
+    /** 新增场地 */
+    public void insert(Venue venue) {
+        String sql = "INSERT INTO venues (" + INSERT_COLUMNS + ") VALUES (?, ?, ?, ?, ?)";
+        jdbcTemplate.update(sql,
+                venue.getName(),
+                venue.getAddress(),
+                venue.getLng(),
+                venue.getLat(),
+                venue.getEnabled());
+    }
 }
