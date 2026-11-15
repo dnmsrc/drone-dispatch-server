@@ -19,9 +19,9 @@ public class VenueService {
         this.venueRepository = venueRepository;
     }
 
-    /** 查询启用且未删除的场地列表 */
-    public List<Venue> listEnabledVenues() {
-        return venueRepository.findEnabledVenues();
+    /** 查询全部未删除的场地列表（含停用态）；仅过滤软删数据，启用与否交由前端展示 */
+    public List<Venue> listVenues() {
+        return venueRepository.findAllVenues();
     }
 
     /** 新增场地：校验入参 → DTO 转实体 → 交给 Repository 落库 */

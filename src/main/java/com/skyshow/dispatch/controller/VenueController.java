@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** 场地接口：对外提供启用场地列表。 */
+/** 场地接口：对外提供未删除场地列表（含启用/停用）。 */
 @RestController
 @RequestMapping("/api/venues")
 public class VenueController {
@@ -27,10 +27,10 @@ public class VenueController {
         this.venueService = venueService;
     }
 
-    /** 查询启用且未删除的场地列表 */
+    /** 查询全部未删除的场地列表（含启用/停用，停用态前端以 enabled 标记区分） */
     @GetMapping
     public Result<List<Venue>> list() {
-        return Result.success(venueService.listEnabledVenues());
+        return Result.success(venueService.listVenues());
     }
 
     /** 新增场地 */

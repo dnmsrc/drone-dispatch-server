@@ -38,10 +38,10 @@ public class VenueRepository {
     /** 明确列出要查的列，不用 SELECT *（表结构变更时更稳、也不查多余数据） */
     private static final String COLUMNS = "id, name, address, lng, lat, enabled, created_at, updated_at, deleted, deleted_at";
 
-    /** 查询所有「启用且未删除」的场地，按 id 升序 */
-    public List<Venue> findEnabledVenues() {
+    /** 查询所有「未删除」的场地（含启用与停用，停用态由前端按 enabled 标记展示），按 id 升序 */
+    public List<Venue> findAllVenues() {
         String sql = "SELECT " + COLUMNS
-                + " FROM venues WHERE enabled = 1 AND deleted = 0 ORDER BY id";
+                + " FROM venues WHERE deleted = 0 ORDER BY id";
         return jdbcTemplate.query(sql, VENUE_MAPPER);
     }
 
