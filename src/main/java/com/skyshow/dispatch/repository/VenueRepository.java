@@ -65,15 +65,16 @@ public class VenueRepository {
         return list.stream().findFirst();
     }
 
-    /** 按 id 修改 4 个业务字段；updated_at 由数据库 ON UPDATE 自动刷新，返回受影响行数 */
+    /** 按 id 修改业务字段（含启用状态）；updated_at 由数据库 ON UPDATE 自动刷新，返回受影响行数 */
     public int update(Venue venue) {
-        String sql = "UPDATE venues SET name = ?, address = ?, lng = ?, lat = ? "
+        String sql = "UPDATE venues SET name = ?, address = ?, lng = ?, lat = ?, enabled = ? "
                 + "WHERE id = ? AND deleted = 0";
         return jdbcTemplate.update(sql,
                 venue.getName(),
                 venue.getAddress(),
                 venue.getLng(),
                 venue.getLat(),
+                venue.getEnabled(),
                 venue.getId());
     }
 

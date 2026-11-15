@@ -38,7 +38,9 @@ public class VenueService {
         venue.setAddress(normalizeAddress(request.address()));
         venue.setLng(request.lng());
         venue.setLat(request.lat());
-        venue.setEnabled(1); // 业务规则：新增默认启用，放在 Service 而不是 SQL
+        // enabled 随新增表单的开关提交；不传时兜底为启用（对齐前端开关默认打开）
+        boolean enabledOnCreate = request.enabled() == null || request.enabled();
+        venue.setEnabled(toEnabledFlag(enabledOnCreate));
 
         // 3. 交给数据访问层落库
         venueRepository.insert(venue);
@@ -60,12 +62,17 @@ public class VenueService {
         if (request.name() == null || request.name().isBlank()) {
             throw new BizException(400, "场地名称不能为空");
         }
+        // 编辑表单的启用开关必传：缺失即视为非法请求，避免把启用态静默置空
+        if (request.enabled() == null) {
+            throw new BizException(400, "启用状态不能为空");
+        }
 
-        // 3. 在查出来的实体上改字段；id、enabled、时间戳等保持原值不动
+        // 3. 在查出来的实体上改字段；id、时间戳等保持原值不动，enabled 随表单开关更新
         venue.setName(request.name());
         venue.setAddress(normalizeAddress(request.address()));
         venue.setLng(request.lng());
         venue.setLat(request.lat());
+        venue.setEnabled(toEnabledFlag(request.enabled()));
 
         // 4. 落库
         venueRepository.update(venue);
@@ -81,5 +88,10 @@ public class VenueService {
     /** 地址选填：null 或纯空白统一归一空串（address 列为 NOT NULL，空串表达「未填写」） */
     private String normalizeAddress(String address) {
         return address == null || address.isBlank() ? "" : address.trim();
+    }
+
+    /** 前端布尔开关 → 数据库 TINYINT 启用标记：true=1 启用 / false=0 停用，转换规则全类收口于此 */
+    private Integer toEnabledFlag(boolean enabled) {
+        return enabled ? 1 : 0;
     }
 }
