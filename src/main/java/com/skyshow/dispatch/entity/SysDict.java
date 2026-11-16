@@ -5,9 +5,9 @@ import java.time.LocalDateTime;
 /** 字典类型，对应数据库表 sys_dict（若依风格两级字典的「类型」层）。 */
 public class SysDict {
     private Long id;
-    /** 字典编码，程序里引用它（如 drone_tier），表内唯一 */
+    /** 字典编码，程序里引用它（如 order_status），表内唯一 */
     private String dictCode;
-    /** 显示名，如「架次档位」 */
+    /** 显示名，如「订单状态」 */
     private String dictName;
     /** 内置标记：1 内置字典（禁止删类型）/ 0 自定义 */
     private Integer systemFlag;

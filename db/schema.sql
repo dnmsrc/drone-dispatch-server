@@ -50,11 +50,11 @@ CREATE TABLE IF NOT EXISTS admin_users (
 
 -- ─────────────────────── 基础配置域（5 表）───────────────────────
 
--- 3. 字典类型（7 类：drone_tier/duration/pattern/addon/time_slot/refund_rule/order_status）
+-- 3. 字典类型（只放不带价格的系统级纯枚举，如 order_status；带价规则在 pricing_rule）
 CREATE TABLE IF NOT EXISTS sys_dict (
     id          BIGINT      NOT NULL AUTO_INCREMENT,
     dict_code   VARCHAR(32) NOT NULL COMMENT '字典编码，程序里引用它',
-    dict_name   VARCHAR(32) NOT NULL COMMENT '显示名，如「架次档位」',
+    dict_name   VARCHAR(32) NOT NULL COMMENT '显示名，如「订单状态」',
     system_flag TINYINT     NOT NULL DEFAULT 1 COMMENT '内置字典禁止删除',
     remark      VARCHAR(255) NULL,
     sort        INT          NOT NULL DEFAULT 0 COMMENT '排序号，升序；缺省按新增顺序（max+1）',
