@@ -26,5 +26,10 @@ INSERT IGNORE INTO sys_config (config_key, config_value, remark) VALUES
 INSERT IGNORE INTO sys_config (config_key, config_value, remark) VALUES
     ('pay_expire_minutes', CAST('15' AS JSON), '支付时限（分钟，1-120），订单 expire_at 据此计算');
 
+-- ── 档期域：全局默认接单时段（JSON 数组）与预约窗口（天）──
+INSERT IGNORE INTO sys_config (config_key, config_value, remark) VALUES
+    ('schedule.default_slots', CAST('["19:00-20:00","20:00-21:00","21:00-22:00"]' AS JSON), '全局默认可接单时段（整点区间，单日未单独配置时沿用）'),
+    ('schedule.booking_window_days', CAST('60' AS JSON), '预约窗口（天，7-365），用户最多可预约未来 N 天');
+
 -- 核对
 SELECT config_key, config_value FROM sys_config ORDER BY config_key;

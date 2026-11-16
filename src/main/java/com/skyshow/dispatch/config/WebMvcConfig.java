@@ -33,7 +33,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/demo/error",
                         // H5 用户端只读：下单计价规则与退款阶梯，匿名可浏览（管理端写接口仍需 ADMIN）
                         "/api/pricing/public",
-                        "/api/pricing/refund-rules"
+                        "/api/pricing/refund-rules",
+                        // H5 用户端只读：档期日历（可预约时段），匿名可浏览
+                        "/api/schedule/public"
                 );
     }
 }
