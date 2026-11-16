@@ -22,5 +22,9 @@ INSERT IGNORE INTO sys_config (config_key, config_value, remark) VALUES
     ('pricing.custom_text_price', CAST('2000' AS JSON), '空中文字定制加价（元，0-100000）'),
     ('pricing.custom_logo_price', CAST('5000' AS JSON), 'LOGO / 图片定制加价（元，0-100000）');
 
+-- ── 支付域：下单后支付时限（分钟），超时未付自动取消 ──
+INSERT IGNORE INTO sys_config (config_key, config_value, remark) VALUES
+    ('pay_expire_minutes', CAST('15' AS JSON), '支付时限（分钟，1-120），订单 expire_at 据此计算');
+
 -- 核对
 SELECT config_key, config_value FROM sys_config ORDER BY config_key;
