@@ -30,7 +30,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         // 健康检查，供探活/监控使用
                         "/api/health",
                         // 演示异常接口，保持可直接访问
-                        "/api/demo/error"
+                        "/api/demo/error",
+                        // H5 用户端只读：下单计价规则与退款阶梯，匿名可浏览（管理端写接口仍需 ADMIN）
+                        "/api/pricing/public",
+                        "/api/pricing/refund-rules"
                 );
     }
 }
