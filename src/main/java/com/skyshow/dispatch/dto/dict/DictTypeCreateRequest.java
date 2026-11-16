@@ -7,9 +7,11 @@ package com.skyshow.dispatch.dto.dict;
  * @param dictCode 类型标识，正则 ^[a-z][a-z0-9_]{1,31}$ 且库内唯一
  * @param dictName 类型显示名，必填非空白
  * @param remark   用途说明，选填
+ * @param sort     排序号，选填；为空时服务端取当前 max(sort)+1 排到末尾
  */
 public record DictTypeCreateRequest(
         String dictCode,
         String dictName,
-        String remark) {
+        String remark,
+        Integer sort) {
 }

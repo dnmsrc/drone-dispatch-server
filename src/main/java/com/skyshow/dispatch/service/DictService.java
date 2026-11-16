@@ -69,6 +69,8 @@ public class DictService {
         dict.setDictCode(code);
         dict.setDictName(name);
         dict.setRemark(trimToEmpty(request.remark()));
+        // 排序缺省 = 当前最大排序号 + 1，保证新类型按新增顺序排到末尾；显式传入则校验后采用
+        dict.setSort(request.sort() != null ? requireSort(request.sort()) : dictRepository.findMaxSort() + 1);
         // 新建恒为自定义类型，system_flag 在 Repository 写死为 0
         dictRepository.insert(dict);
     }
@@ -81,7 +83,9 @@ public class DictService {
             throw new BizException(400, "请求体不能为空");
         }
         String name = requireName(request.dictName());
-        dictRepository.update(dict.getDictCode(), name, trimToEmpty(request.remark()));
+        // sort 为空则保持原值；显式传入则校验后更新（dict_code 仍不可改）
+        Integer sort = request.sort() != null ? requireSort(request.sort()) : dict.getSort();
+        dictRepository.update(dict.getDictCode(), name, trimToEmpty(request.remark()), sort);
     }
 
     /** 物理删除整组：内置类型拒绝；非内置同事务先清字典项再删类型，仅 ADMIN */
@@ -110,6 +114,7 @@ public class DictService {
                 dict.getDictName(),
                 trimToEmpty(dict.getRemark()),
                 dict.getSystemFlag(),
+                dict.getSort(),
                 items.size(),
                 (int) items.stream().filter(i -> i.status() != null && i.status() == 1).count(),
                 items);
@@ -228,6 +233,14 @@ public class DictService {
         return status != null && status == 0 ? 0 : 1;
     }
 
+    /** 排序号必须为非负整数（前端输入框限定 1-999，后端兜底拒绝负数） */
+    private Integer requireSort(Integer sort) {
+        if (sort == null || sort < 0) {
+            throw new BizException(400, "排序号需为不小于 0 的整数");
+        }
+        return sort;
+    }
+
     private String trim(String s) {
         return s == null ? "" : s.trim();
     }
@@ -246,6 +259,7 @@ public class DictService {
                 dict.getDictName(),
                 trimToEmpty(dict.getRemark()),
                 dict.getSystemFlag(),
+                dict.getSort(),
                 itemRepository.countByDictCode(code),
                 itemRepository.countEnabledByDictCode(code));
     }

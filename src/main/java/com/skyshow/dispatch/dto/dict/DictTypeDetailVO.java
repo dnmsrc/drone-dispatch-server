@@ -10,6 +10,7 @@ public record DictTypeDetailVO(
         String dictName,
         String remark,
         Integer systemFlag,
+        Integer sort,
         Integer itemCount,
         Integer enabledCount,
         List<DictItemVO> items) {

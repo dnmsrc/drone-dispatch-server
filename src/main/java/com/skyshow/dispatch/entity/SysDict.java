@@ -12,6 +12,8 @@ public class SysDict {
     /** 内置标记：1 内置字典（禁止删类型）/ 0 自定义 */
     private Integer systemFlag;
     private String remark;
+    /** 排序号，升序；新增类型缺省取当前 max(sort)+1，保证按新增顺序排到末尾 */
+    private Integer sort;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -53,6 +55,14 @@ public class SysDict {
 
     public void setRemark(String remark) {
         this.remark = remark;
+    }
+
+    public Integer getSort() {
+        return sort;
+    }
+
+    public void setSort(Integer sort) {
+        this.sort = sort;
     }
 
     public LocalDateTime getCreatedAt() {

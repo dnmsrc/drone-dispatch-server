@@ -9,6 +9,7 @@ public record DictTypeSummaryVO(
         String dictName,
         String remark,
         Integer systemFlag,
+        Integer sort,
         Integer itemCount,
         Integer enabledCount) {
 }

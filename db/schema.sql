@@ -57,10 +57,12 @@ CREATE TABLE IF NOT EXISTS sys_dict (
     dict_name   VARCHAR(32) NOT NULL COMMENT '显示名，如「架次档位」',
     system_flag TINYINT     NOT NULL DEFAULT 1 COMMENT '内置字典禁止删除',
     remark      VARCHAR(255) NULL,
+    sort        INT          NOT NULL DEFAULT 0 COMMENT '排序号，升序；缺省按新增顺序（max+1）',
     created_at  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
-    UNIQUE KEY uk_dict_code (dict_code)
+    UNIQUE KEY uk_dict_code (dict_code),
+    KEY idx_sys_dict_sort (sort)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='字典类型';
 
 -- 4. 字典项
