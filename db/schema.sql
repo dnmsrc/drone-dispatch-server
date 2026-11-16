@@ -94,6 +94,28 @@ CREATE TABLE IF NOT EXISTS sys_config (
     UNIQUE KEY uk_config_key (config_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统配置';
 
+-- 5.5 计价规则（带价规则从字典独立：一个分组 group 下若干行，启停 status、排序 sort）
+-- 设计取舍：5 类带价规则字段高度同构（键 + 文案 + 数值 + 备注），用单表 + group 区分，
+--   不再借 sys_dict 的壳，但保留 key/value/extra 通用列，迁移与后续计价服务复用成本最低。
+-- group 取值：tier 架次档位 / duration 表演时长 / addon 附加服务 /
+--   pattern 预设图案（0 元可选项，归计价域统一维护）/ refund 退款阶梯。
+-- 定制文字价、LOGO 价是两个标量，结构不同，走 sys_config（pricing.custom_text_price / custom_logo_price），不入此表。
+CREATE TABLE IF NOT EXISTS pricing_rule (
+    id         BIGINT        NOT NULL AUTO_INCREMENT,
+    group_code VARCHAR(24)   NOT NULL COMMENT '规则分组：tier/duration/addon/pattern/refund',
+    item_key   VARCHAR(32)   NOT NULL COMMENT '组内程序用 key：架次数/分钟数/英文 key/退款小时下限',
+    item_label VARCHAR(64)   NOT NULL COMMENT '显示文案，如「100 架」「专属音乐编曲」',
+    item_value DECIMAL(14,4) NOT NULL DEFAULT 0 COMMENT '数值：价格/加价/退款比例(0-1)；不加价项为 0',
+    extra      VARCHAR(255)  NULL COMMENT '附加说明：架次适用场景等',
+    sort       INT           NOT NULL DEFAULT 0 COMMENT '组内排序号，升序',
+    status     TINYINT       NOT NULL DEFAULT 1 COMMENT '1 启用 0 停用；停用后用户端拉取不到',
+    created_at DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_pricing_group_key (group_code, item_key),
+    KEY idx_pricing_group_sort (group_code, status, sort)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='计价规则（带价规则，按分组维护）';
+
 -- 6. 预设场地
 CREATE TABLE IF NOT EXISTS venues (
     id         BIGINT        NOT NULL AUTO_INCREMENT,
