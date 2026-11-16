@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS sys_dict_item (
 -- 5. 系统配置（key-value，值统一 JSON 类型）
 CREATE TABLE IF NOT EXISTS sys_config (
     id           BIGINT      NOT NULL AUTO_INCREMENT,
-    config_key   VARCHAR(64) NOT NULL COMMENT 'daily_limit / pay_expire_minutes ...',
+    config_key   VARCHAR(64) NOT NULL COMMENT 'pay_expire_minutes / pricing.custom_text_price ...',
     config_value JSON        NOT NULL COMMENT '数字、数组都以 JSON 存放',
     remark       VARCHAR(255) NULL,
     created_at   DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -132,12 +132,13 @@ CREATE TABLE IF NOT EXISTS venues (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='预设场地';
 
 -- 7. 档期日配置（一天一行）
+-- 容量口径（对齐原型 v7）：当日可接单名额 = slots 时段数（一个时段 = 一个名额），
+--   不再设独立的 daily_limit 列；名额由时段派生，已订满的时段在服务端计算 openSlots 时过滤。
 CREATE TABLE IF NOT EXISTS schedule_days (
     id          BIGINT      NOT NULL AUTO_INCREMENT,
     schedule_date DATE      NOT NULL,
-    daily_limit INT         NULL COMMENT '当日上限，NULL = 沿用全局配置',
     closed      TINYINT     NOT NULL DEFAULT 0 COMMENT '休整日标记',
-    slots       JSON        NULL COMMENT '当日时段数组，NULL = 用默认时段',
+    slots       JSON        NULL COMMENT '当日时段数组，NULL = 用全局默认时段；[] = 当日不接单',
     note        VARCHAR(100) NULL COMMENT '休整/节日说明',
     created_at  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at  DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
