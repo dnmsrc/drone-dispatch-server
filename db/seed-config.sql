@@ -22,6 +22,14 @@ INSERT IGNORE INTO sys_config (config_key, config_value, remark) VALUES
     ('pricing.custom_text_price', CAST('2000' AS JSON), '空中文字定制加价（元，0-100000）'),
     ('pricing.custom_logo_price', CAST('5000' AS JSON), 'LOGO / 图片定制加价（元，0-100000）');
 
+-- ── 计价域：五个分组总闸（JSON 布尔，缺省 fail-open 视为启用；关组只影响 H5 可选，不改 pricing_rule 行 status）──
+INSERT IGNORE INTO sys_config (config_key, config_value, remark) VALUES
+    ('pricing.tier_enabled',     CAST('true' AS JSON), '架次档位组总闸（false 时 H5 拉不到该组）'),
+    ('pricing.duration_enabled', CAST('true' AS JSON), '表演时长组总闸（false 时 H5 拉不到该组）'),
+    ('pricing.addon_enabled',    CAST('true' AS JSON), '附加服务组总闸（false 时 H5 拉不到该组）'),
+    ('pricing.pattern_enabled',  CAST('true' AS JSON), '预设图案组总闸（false 时 H5 拉不到该组）'),
+    ('pricing.refund_enabled',   CAST('true' AS JSON), '退款阶梯组总闸（false 时 H5 拉不到该组）');
+
 -- ── 支付域：下单后支付时限（分钟），超时未付自动取消 ──
 INSERT IGNORE INTO sys_config (config_key, config_value, remark) VALUES
     ('pay_expire_minutes', CAST('15' AS JSON), '支付时限（分钟，1-120），订单 expire_at 据此计算');

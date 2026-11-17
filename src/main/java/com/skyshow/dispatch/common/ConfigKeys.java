@@ -17,6 +17,20 @@ public final class ConfigKeys {
     /** LOGO / 图片定制价格（元） */
     public static final String PRICING_CUSTOM_LOGO = "pricing.custom_logo_price";
 
+    /* ── 计价域分组总闸（布尔，sys_config 存 JSON true/false，缺省 fail-open 视为启用）──
+     * 与行级 status 区分：这是整组总闸，关闭后 H5 拉取不到该组任何项，但不改动 pricing_rule 各行 status。
+     * 命名沿用「领域点号 + 蛇形」，组名用后端单数 group_code（tier/duration/addon/pattern/refund）。 */
+    /** 架次档位组开关 */
+    public static final String PRICING_TIER_ENABLED = "pricing.tier_enabled";
+    /** 表演时长组开关 */
+    public static final String PRICING_DURATION_ENABLED = "pricing.duration_enabled";
+    /** 附加服务组开关 */
+    public static final String PRICING_ADDON_ENABLED = "pricing.addon_enabled";
+    /** 预设图案组开关 */
+    public static final String PRICING_PATTERN_ENABLED = "pricing.pattern_enabled";
+    /** 退款阶梯组开关 */
+    public static final String PRICING_REFUND_ENABLED = "pricing.refund_enabled";
+
     /* ── 支付域 ── */
     /** 下单后支付时限（分钟），超时未付自动取消 */
     public static final String PAY_EXPIRE_MINUTES = "pay_expire_minutes";
