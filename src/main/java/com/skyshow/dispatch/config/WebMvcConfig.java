@@ -31,7 +31,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/health",
                         // 演示异常接口，保持可直接访问
                         "/api/demo/error",
-                        // H5 用户端只读：下单计价规则与退款阶梯，匿名可浏览（管理端写接口仍需 ADMIN）
+                        // H5 用户端只读：计价分组总闸状态、下单计价规则与退款阶梯，匿名可浏览（管理端写接口仍需 ADMIN）
+                        "/api/pricing/group-status",
                         "/api/pricing/public",
                         "/api/pricing/refund-rules",
                         // H5 用户端只读：档期日历（可预约时段），匿名可浏览

@@ -3,6 +3,8 @@ package com.skyshow.dispatch.controller;
 import com.skyshow.dispatch.common.Result;
 import com.skyshow.dispatch.dto.pricing.CustomFeeRequest;
 import com.skyshow.dispatch.dto.pricing.CustomFeeVO;
+import com.skyshow.dispatch.dto.pricing.GroupStatusVO;
+import com.skyshow.dispatch.dto.pricing.GroupSwitchUpdateRequest;
 import com.skyshow.dispatch.dto.pricing.PricingGroupSaveRequest;
 import com.skyshow.dispatch.dto.pricing.PricingGroupVO;
 import com.skyshow.dispatch.dto.pricing.PricingPublicVO;
@@ -64,6 +66,14 @@ public class PricingController {
         return Result.success(null);
     }
 
+    /** ④.1 分组总闸启停（整组在 H5 是否可选，不改组内各行 status）；仅 ADMIN */
+    @PutMapping("/groups/{group}/enabled")
+    public Result<Void> updateGroupSwitch(@PathVariable String group,
+                                          @RequestBody GroupSwitchUpdateRequest request) {
+        pricingService.updateGroupSwitch(group, request);
+        return Result.success(null);
+    }
+
     /* ═══════════════════ 管理端：定制收费标量 ═══════════════════ */
 
     /** ⑤ 读定制文字价 / LOGO 价 */
@@ -80,6 +90,12 @@ public class PricingController {
     }
 
     /* ═══════════════════ H5：只读启用视图 ═══════════════════ */
+
+    /** ⑦.0 H5 分组总闸状态：H5 先拉本接口，仅对 enabled=true 的组再请求计价数据（匿名可访问） */
+    @GetMapping("/group-status")
+    public Result<List<GroupStatusVO>> groupStatus() {
+        return Result.success(pricingService.listGroupStatus());
+    }
 
     /** ⑦ H5 下单计价规则（仅启用项，字段对齐原型 priceRules，不含时段） */
     @GetMapping("/public")

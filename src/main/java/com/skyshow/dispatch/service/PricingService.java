@@ -4,6 +4,8 @@ import com.skyshow.dispatch.common.BizException;
 import com.skyshow.dispatch.common.ConfigKeys;
 import com.skyshow.dispatch.dto.pricing.CustomFeeRequest;
 import com.skyshow.dispatch.dto.pricing.CustomFeeVO;
+import com.skyshow.dispatch.dto.pricing.GroupStatusVO;
+import com.skyshow.dispatch.dto.pricing.GroupSwitchUpdateRequest;
 import com.skyshow.dispatch.dto.pricing.PricingGroupSaveRequest;
 import com.skyshow.dispatch.dto.pricing.PricingGroupVO;
 import com.skyshow.dispatch.dto.pricing.PricingPublicVO;
@@ -21,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -37,6 +41,25 @@ public class PricingService {
 
     /** 合法计价分组白名单（refund 即原字典 refund_rule） */
     private static final Set<String> GROUPS = Set.of("tier", "duration", "addon", "pattern", "refund");
+
+    /** 五个分组的固定返回顺序（管理端视图、H5 组状态接口共用，保证 Tab/列表顺序稳定） */
+    private static final List<String> GROUP_ORDER = List.of("tier", "duration", "addon", "pattern", "refund");
+
+    /**
+     * 分组 → 分组总闸配置键（sys_config 布尔）。组开关与行级 status 是两层：
+     * 组开关管「H5 整组是否可选」，行 status 管组内单项；关组不改任何行 status。
+     */
+    private static final Map<String, String> GROUP_ENABLED_KEYS;
+
+    static {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("tier", ConfigKeys.PRICING_TIER_ENABLED);
+        m.put("duration", ConfigKeys.PRICING_DURATION_ENABLED);
+        m.put("addon", ConfigKeys.PRICING_ADDON_ENABLED);
+        m.put("pattern", ConfigKeys.PRICING_PATTERN_ENABLED);
+        m.put("refund", ConfigKeys.PRICING_REFUND_ENABLED);
+        GROUP_ENABLED_KEYS = Map.copyOf(m);
+    }
 
     /** 定制价 / 支付时限缺省值（sys_config 尚未写入时兜底，对齐原型种子） */
     private static final BigDecimal DEFAULT_TEXT_PRICE = new BigDecimal("2000");
@@ -55,19 +78,46 @@ public class PricingService {
 
     /* ═══════════════════ 管理端：分组视图 ═══════════════════ */
 
-    /** 全部分组的管理端视图（含停用项），按固定分组顺序返回 */
+    /** 全部分组的管理端视图（含停用项），按固定分组顺序返回；每组带分组总闸 enabled */
     public List<PricingGroupVO> listAllGroups() {
         List<PricingGroupVO> result = new ArrayList<>();
-        for (String group : List.of("tier", "duration", "addon", "pattern", "refund")) {
-            result.add(new PricingGroupVO(group, toVOList(ruleRepository.findByGroup(group))));
+        for (String group : GROUP_ORDER) {
+            result.add(toGroupVO(group));
         }
         return result;
     }
 
-    /** 单个分组的管理端视图（含停用项） */
+    /** 单个分组的管理端视图（含停用项与分组总闸状态） */
     public PricingGroupVO getGroup(String group) {
         requireGroup(group);
-        return new PricingGroupVO(group, toVOList(ruleRepository.findByGroup(group)));
+        return toGroupVO(group);
+    }
+
+    /** 组装单个分组管理端视图：items 始终全量（含停用行），enabled 反映分组总闸 */
+    private PricingGroupVO toGroupVO(String group) {
+        return new PricingGroupVO(group, isGroupEnabled(group), toVOList(ruleRepository.findByGroup(group)));
+    }
+
+    /* ═══════════════════ 管理端 / H5：分组总闸 ═══════════════════ */
+
+    /** H5 组状态视图：按固定顺序返回五组总闸，供 H5 决定哪些组需要进一步请求 */
+    public List<GroupStatusVO> listGroupStatus() {
+        List<GroupStatusVO> result = new ArrayList<>();
+        for (String group : GROUP_ORDER) {
+            result.add(new GroupStatusVO(group, isGroupEnabled(group)));
+        }
+        return result;
+    }
+
+    /** 改分组总闸（仅 ADMIN）；只写 sys_config 布尔键，不触碰 pricing_rule 各行 status */
+    public void updateGroupSwitch(String group, GroupSwitchUpdateRequest request) {
+        requireAdmin();
+        requireGroup(group);
+        if (request == null || request.enabled() == null) {
+            throw new BizException(400, "enabled 不能为空（true/false）");
+        }
+        // sys_config 布尔统一存 JSON true/false（String.valueOf 落库即 JSON 布尔）
+        configRepository.upsertValue(GROUP_ENABLED_KEYS.get(group), String.valueOf(request.enabled()));
     }
 
     /**
@@ -189,15 +239,17 @@ public class PricingService {
     /* ═══════════════════ H5：只读启用视图 ═══════════════════ */
 
     /**
-     * H5 下单计价视图：只含启用项，字段对齐原型 priceRules，一次拿全下单所需规则。
+     * H5 下单计价视图：只含「分组总闸开启 且 行 status=1」的项，字段对齐原型 priceRules，
+     * 一次拿全下单所需规则。组总闸关闭时该组直接返回空数组（不查行、不返回任何项）；
+     * 定制价与支付时限不属于任何分组，不受组开关影响。
      * 时段不在此返回（P4 决策砍掉 timeSlots，时段由档期 openSlots 驱动）。
      */
     public PricingPublicVO getPublicPricing() {
         CustomFeeVO fees = getCustomFees();
-        List<PricingRule> tiers = ruleRepository.findEnabledByGroup("tier");
-        List<PricingRule> durations = ruleRepository.findEnabledByGroup("duration");
-        List<PricingRule> addons = ruleRepository.findEnabledByGroup("addon");
-        List<PricingRule> patterns = ruleRepository.findEnabledByGroup("pattern");
+        List<PricingRule> tiers = enabledRulesIfGroupOn("tier");
+        List<PricingRule> durations = enabledRulesIfGroupOn("duration");
+        List<PricingRule> addons = enabledRulesIfGroupOn("addon");
+        List<PricingRule> patterns = enabledRulesIfGroupOn("pattern");
 
         return new PricingPublicVO(
                 tiers.stream().map(r -> new PricingPublicVO.Tier(
@@ -213,12 +265,23 @@ public class PricingService {
                 readInt(ConfigKeys.PAY_EXPIRE_MINUTES, DEFAULT_PAY_EXPIRE));
     }
 
-    /** 退款阶梯只读视图：启用项按 minHours 降序 */
+    /** 退款阶梯只读视图：refund 组总闸开启时才取启用项，按 minHours 降序；关组返回空数组 */
     public List<RefundRuleVO> getRefundRules() {
-        return ruleRepository.findEnabledByGroup("refund").stream()
+        return enabledRulesIfGroupOn("refund").stream()
                 .map(r -> new RefundRuleVO(parseIntKey(r.getItemKey()), r.getItemValue(), r.getItemLabel()))
                 .sorted((a, b) -> Integer.compare(b.minHours(), a.minHours()))
                 .toList();
+    }
+
+    /**
+     * 组总闸开启 → 返回该组启用行；关闭 → 返回空列表（短路，不查库）。
+     * 组开关与行 status 是两层 AND 过滤，本方法把两层收口在一处，H5 装配统一调用。
+     */
+    private List<PricingRule> enabledRulesIfGroupOn(String group) {
+        if (!isGroupEnabled(group)) {
+            return List.of();
+        }
+        return ruleRepository.findEnabledByGroup(group);
     }
 
     /* ═══════════════════ 私有校验 / 转换 ═══════════════════ */
@@ -274,6 +337,20 @@ public class PricingService {
                 .filter(s -> !s.isEmpty())
                 .map(Integer::parseInt)
                 .orElse(fallback);
+    }
+
+    /**
+     * 读某分组总闸。sys_config 布尔统一存 JSON true/false，取出即字符串 "true"/"false"，
+     * 用 {@link Boolean#parseBoolean} 解析（仅 "true" 忽略大小写为真）。
+     * fail-open：键缺失 / 空白 / 非法值一律视为启用，避免漏配导致整组计价在 H5 消失。
+     */
+    private boolean isGroupEnabled(String group) {
+        String key = GROUP_ENABLED_KEYS.get(group);
+        return configRepository.findValue(key)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(Boolean::parseBoolean)
+                .orElse(true);
     }
 
     private Integer parseIntKey(String key) {
