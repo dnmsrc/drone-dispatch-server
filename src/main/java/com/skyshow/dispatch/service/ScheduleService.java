@@ -8,6 +8,7 @@ import com.skyshow.dispatch.common.BizException;
 import com.skyshow.dispatch.common.ConfigKeys;
 import com.skyshow.dispatch.common.SlotRules;
 import com.skyshow.dispatch.dto.schedule.DayClosedRequest;
+import com.skyshow.dispatch.dto.schedule.DayNoteRequest;
 import com.skyshow.dispatch.dto.schedule.DaySlotsRequest;
 import com.skyshow.dispatch.dto.schedule.GlobalScheduleUpdateRequest;
 import com.skyshow.dispatch.dto.schedule.GlobalScheduleVO;
@@ -235,6 +236,30 @@ public class ScheduleService {
         }
         String note = request.note() != null ? request.note().trim() : existing.getNote();
         dayRepository.upsertDay(date, closed, existing.getSlots(), note);
+    }
+
+    /**
+     * 只写单日说明（节假日 / 特殊日标注），不动接单时段与休整状态；空串 = 取消标注。
+     *
+     * <p>此前 note 只能借 closed 端点写入，且必须回传 closed 原值，并发下会把别人刚设的
+     * 休整状态翻回去。独立端点让「改说明」与「改档期状态」互不干扰，返回最新单日视图供前端回填。
+     */
+    public ScheduleCellVO saveDayNote(LocalDate date, DayNoteRequest request) {
+        requireAdmin();
+        if (request == null) {
+            throw new BizException(400, "请求体不能为空");
+        }
+        String note = request.note() == null ? "" : request.note().trim();
+        ScheduleDay existing = dayRepository.findByDate(date).orElse(null);
+        if (existing == null) {
+            // 从未配置过的日期：只有非空说明才需要建行，否则保持「沿用默认」不建行
+            if (!note.isEmpty()) {
+                dayRepository.upsertDay(date, 0, null, note);
+            }
+        } else {
+            dayRepository.upsertDay(date, isClosed(existing) ? 1 : 0, existing.getSlots(), note);
+        }
+        return getDay(date);
     }
 
     /* ═══════════════════ 内部装配 ═══════════════════ */

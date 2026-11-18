@@ -3,6 +3,7 @@ package com.skyshow.dispatch.controller;
 import com.skyshow.dispatch.common.BizException;
 import com.skyshow.dispatch.common.Result;
 import com.skyshow.dispatch.dto.schedule.DayClosedRequest;
+import com.skyshow.dispatch.dto.schedule.DayNoteRequest;
 import com.skyshow.dispatch.dto.schedule.DaySlotsRequest;
 import com.skyshow.dispatch.dto.schedule.GlobalScheduleUpdateRequest;
 import com.skyshow.dispatch.dto.schedule.GlobalScheduleVO;
@@ -82,7 +83,7 @@ public class ScheduleController {
         return Result.success(scheduleService.saveDaySlots(ScheduleService.parseDate(date), request));
     }
 
-    /** ⑥ 设置 / 取消休整日（仅 ADMIN） */
+    /** ⑥ 设置 / 取消休整日（仅 ADMIN；该日已有订单时 400 拒绝） */
     @PutMapping("/days/{date}/closed")
     public Result<Void> setClosed(@PathVariable String date,
                                   @RequestBody DayClosedRequest request) {
@@ -90,9 +91,16 @@ public class ScheduleController {
         return Result.success(null);
     }
 
+    /** ⑦ 只写单日说明（节假日 / 特殊日标注，仅 ADMIN；空串 = 取消标注），不动时段与休整状态 */
+    @PutMapping("/days/{date}/note")
+    public Result<ScheduleCellVO> saveDayNote(@PathVariable String date,
+                                              @RequestBody DayNoteRequest request) {
+        return Result.success(scheduleService.saveDayNote(ScheduleService.parseDate(date), request));
+    }
+
     /* ═══════════════════ H5：匿名只读 ═══════════════════ */
 
-    /** ⑦ H5 拉取区间档期（from/to 为 YYYY-MM-DD），只暴露派生后的可预约信息，限今天起 + 预约窗口内 */
+    /** ⑧ H5 拉取区间档期（from/to 为 YYYY-MM-DD），只暴露派生后的可预约信息，限今天起 + 预约窗口内 */
     @GetMapping("/public")
     public Result<ScheduleMonthVO> publicMonth(@RequestParam String from,
                                                @RequestParam String to) {
