@@ -3,11 +3,13 @@ package com.skyshow.dispatch.common;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 全局异常处理：所有 controller 抛出的异常都在这被接住，统一装进 Result 信封
@@ -36,6 +38,19 @@ public class GlobalExceptionHandler {
             MethodArgumentTypeMismatchException.class})
     public Result<Void> handleBadRequest(Exception e) {
         return Result.error(400, "请求参数缺失或格式错误");
+    }
+
+    // 路径不存在：返回 404，不再兜成 500「系统繁忙」（否则排障时会误以为服务挂了）
+    @ExceptionHandler(NoResourceFoundException.class)
+    public Result<Void> handleNotFound(NoResourceFoundException e) {
+        return Result.error(404, "接口不存在");
+    }
+
+    // 方法不支持：返回 405。该异常在 HandlerMapping 阶段抛出、早于登录拦截器，
+    // 不处理会变成 500，调用方既拿不到 401 也拿不到 405
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public Result<Void> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        return Result.error(405, "请求方法不支持");
     }
 
     // 兜底：所有没预料到的异常（如数据库连不上），统一 500；完整堆栈落日志便于排查
