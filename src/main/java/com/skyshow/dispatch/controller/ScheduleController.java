@@ -8,6 +8,7 @@ import com.skyshow.dispatch.dto.schedule.GlobalScheduleUpdateRequest;
 import com.skyshow.dispatch.dto.schedule.GlobalScheduleVO;
 import com.skyshow.dispatch.dto.schedule.ScheduleCellVO;
 import com.skyshow.dispatch.dto.schedule.ScheduleMonthVO;
+import com.skyshow.dispatch.dto.schedule.SaveSlotsResult;
 import com.skyshow.dispatch.service.ScheduleService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -73,12 +74,12 @@ public class ScheduleController {
         return Result.success(scheduleService.getDay(ScheduleService.parseDate(date)));
     }
 
-    /** ⑤ 配置单日时段（仅 ADMIN；slots 传 null 恢复默认、空数组=不接单） */
+    /** ⑤ 配置单日时段（仅 ADMIN；slots 传 null 恢复默认、空数组=不接单）；
+     *  已订时段会被强制保留并在 blocked 中回报，重叠则 400 */
     @PutMapping("/days/{date}/slots")
-    public Result<Void> saveDaySlots(@PathVariable String date,
-                                     @RequestBody DaySlotsRequest request) {
-        scheduleService.saveDaySlots(ScheduleService.parseDate(date), request);
-        return Result.success(null);
+    public Result<SaveSlotsResult> saveDaySlots(@PathVariable String date,
+                                                @RequestBody DaySlotsRequest request) {
+        return Result.success(scheduleService.saveDaySlots(ScheduleService.parseDate(date), request));
     }
 
     /** ⑥ 设置 / 取消休整日（仅 ADMIN） */

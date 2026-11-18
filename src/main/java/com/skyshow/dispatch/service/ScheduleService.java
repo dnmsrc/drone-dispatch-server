@@ -13,6 +13,7 @@ import com.skyshow.dispatch.dto.schedule.GlobalScheduleUpdateRequest;
 import com.skyshow.dispatch.dto.schedule.GlobalScheduleVO;
 import com.skyshow.dispatch.dto.schedule.ScheduleCellVO;
 import com.skyshow.dispatch.dto.schedule.ScheduleMonthVO;
+import com.skyshow.dispatch.dto.schedule.SaveSlotsResult;
 import com.skyshow.dispatch.entity.ScheduleDay;
 import com.skyshow.dispatch.repository.ScheduleDayRepository;
 import com.skyshow.dispatch.repository.SysConfigRepository;
@@ -29,6 +30,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * 档期业务服务：全局默认时段 / 预约窗口、按月日历、单日覆盖、openSlots 服务端派生。
@@ -136,43 +139,74 @@ public class ScheduleService {
     public ScheduleCellVO getDay(LocalDate date) {
         List<String> defaultSlots = readDefaultSlots();
         ScheduleDay override = dayRepository.findByDate(date).orElse(null);
-        Map<String, Integer> booked = new HashMap<>();
-        for (ScheduleDayRepository.BookedSlotCount c : dayRepository.listBookedCounts(date, date)) {
-            booked.put(c.slot(), c.count());
-        }
-        return buildCell(date, override, defaultSlots, booked);
+        return buildCell(date, override, defaultSlots, bookedCounts(date));
     }
 
     /* ═══════════════════ 单日写操作（仅 ADMIN）═══════════════════ */
 
-    /** 配置单日时段；slots=null 恢复默认，空列表=当日不接单 */
-    public void saveDaySlots(LocalDate date, DaySlotsRequest request) {
+    /**
+     * 配置单日时段；slots=null 恢复默认，空列表=当日不接单。
+     *
+     * <p>已订时段不可被单方面撤销：即便不在请求列表里也强制保留，并在返回体 blocked 中回报；
+     * 保留后与请求时段重叠则整批 400（不写半截），避免订单挂在已消失的时段上。
+     */
+    public SaveSlotsResult saveDaySlots(LocalDate date, DaySlotsRequest request) {
         requireAdmin();
         if (request == null) {
             throw new BizException(400, "请求体不能为空");
         }
         ScheduleDay existing = dayRepository.findByDate(date).orElseGet(() -> newDay(date));
+        Map<String, Integer> booked = bookedCounts(date);
+        String note = trimToEmpty(request.note(), existing.getNote());
+
         if (request.slots() == null) {
-            // 恢复默认：删除覆盖行（若该日还有休整标记则保留行、仅清 slots）
-            if (existing.getId() == null) {
-                return;
-            }
-            if (existing.getClosed() != null && existing.getClosed() == 1) {
-                dayRepository.upsertDay(date, 1, null, trimToEmpty(request.note(), existing.getNote()));
-            } else {
-                dayRepository.deleteByDate(date);
-            }
-            return;
+            return restoreDefaultSlots(date, existing, booked, note);
         }
         // 显式时段：空数组合法（不接单）；非空则走统一规则校验
-        String slotsJson;
-        if (request.slots().isEmpty()) {
-            slotsJson = toJson(List.of());
-        } else {
-            slotsJson = toJson(SlotRules.normalizeList(request.slots()));
+        List<String> wanted = request.slots().isEmpty()
+                ? List.of()
+                : SlotRules.normalizeList(request.slots());
+        List<String> merged = mergeKeepingBooked(wanted, booked);
+        dayRepository.upsertDay(date, 0, toJson(merged), note);
+        return new SaveSlotsResult(date.format(DATE_FMT), merged, blockedOf(booked, wanted));
+    }
+
+    /**
+     * slots=null：回退全局默认时段。
+     *
+     * <p>若该日已订时段不在全局默认里，回退会让已售名额凭空消失，因此这些时段必须保留并写回覆盖行；
+     * 都能被默认覆盖时保持原语义（删除覆盖行），但行上还有备注 / 休整标记时只清 slots、不删行，
+     * 避免「恢复默认时段」顺手把特殊日标注一起清掉。
+     */
+    private SaveSlotsResult restoreDefaultSlots(LocalDate date, ScheduleDay existing,
+                                                Map<String, Integer> booked, String note) {
+        List<String> defaults = readDefaultSlots();
+        List<String> missing = booked.keySet().stream()
+                .filter(slot -> !defaults.contains(slot))
+                .sorted()
+                .toList();
+        if (!missing.isEmpty()) {
+            if (existing.getClosed() != null && existing.getClosed() == 1) {
+                throw new BizException(400, "该日已设为休整日但仍有订单占用时段，请先处理订单再修改档期");
+            }
+            List<String> merged = mergeKeepingBooked(defaults, booked);
+            dayRepository.upsertDay(date, 0, toJson(merged), note);
+            return new SaveSlotsResult(date.format(DATE_FMT), merged, blockedOf(booked, defaults));
         }
-        // 配时段的日子若仍是休整日，自动恢复营业，避免语义冲突
-        dayRepository.upsertDay(date, 0, slotsJson, trimToEmpty(request.note(), existing.getNote()));
+        boolean closed = existing.getClosed() != null && existing.getClosed() == 1;
+        if (existing.getId() == null) {
+            // 从未配置过的日期：只有带说明时才需要建行，否则保持「沿用默认」不建行
+            if (!note.isEmpty()) {
+                dayRepository.upsertDay(date, 0, null, note);
+            }
+            return new SaveSlotsResult(date.format(DATE_FMT), defaults, List.of());
+        }
+        if (closed || !note.isEmpty()) {
+            dayRepository.upsertDay(date, closed ? 1 : 0, null, note);
+        } else {
+            dayRepository.deleteByDate(date);
+        }
+        return new SaveSlotsResult(date.format(DATE_FMT), closed ? List.of() : defaults, List.of());
     }
 
     /** 设置 / 取消休整日 */
@@ -188,6 +222,48 @@ public class ScheduleService {
     }
 
     /* ═══════════════════ 内部装配 ═══════════════════ */
+
+    /** 该日各时段的有效订单数（slot → 订单数），口径同 countBookedSlot */
+    private Map<String, Integer> bookedCounts(LocalDate date) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (ScheduleDayRepository.BookedSlotCount c : dayRepository.listBookedCounts(date, date)) {
+            counts.put(c.slot(), c.count());
+        }
+        return counts;
+    }
+
+    /**
+     * 把已订时段强制并入请求时段：客户已买断的名额不能被管理员单方面删掉。
+     * 并入后仍须满足时段规则：超出单日上限或与请求时段重叠都直接 400（重叠无法「既保留又满足」）。
+     */
+    private List<String> mergeKeepingBooked(List<String> base, Map<String, Integer> booked) {
+        Set<String> union = new TreeSet<>(base);
+        union.addAll(booked.keySet());
+        List<String> merged = new ArrayList<>(union);
+        if (merged.size() > SlotRules.MAX_SLOTS_PER_DAY) {
+            throw new BizException(400, "该日保留已订时段后超过 " + SlotRules.MAX_SLOTS_PER_DAY
+                    + " 段，请先走改期 / 退款处理订单");
+        }
+        List<String> overlap = SlotRules.findOverlap(merged);
+        if (overlap != null) {
+            String bookedSlot = booked.containsKey(overlap.get(0)) ? overlap.get(0) : overlap.get(1);
+            String other = bookedSlot.equals(overlap.get(0)) ? overlap.get(1) : overlap.get(0);
+            throw new BizException(400, "时段「" + other + "」与已有订单的时段「" + bookedSlot
+                    + "」重叠：已订时段不可撤销，请避开后再配置，或先走改期 / 退款流程");
+        }
+        return merged;
+    }
+
+    /** 因已订被强制保留（不在请求列表里）的时段明细，供前端提示 */
+    private List<SaveSlotsResult.BlockedSlot> blockedOf(Map<String, Integer> booked,
+                                                        List<String> requested) {
+        List<SaveSlotsResult.BlockedSlot> list = new ArrayList<>();
+        booked.entrySet().stream()
+                .filter(e -> !requested.contains(e.getKey()))
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(e -> list.add(new SaveSlotsResult.BlockedSlot(e.getKey(), e.getValue())));
+        return list;
+    }
 
     /** 区间合法性：顺序正确且跨度不超过上限（超长区间 = 超量查询，直接 400 挡在入口） */
     private void validateRange(LocalDate from, LocalDate to) {
