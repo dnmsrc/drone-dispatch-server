@@ -162,6 +162,11 @@ public class ScheduleService {
         if (request.slots() == null) {
             return restoreDefaultSlots(date, existing, booked, note);
         }
+        // 休整日不允许直接配时段：必须先「恢复营业」。此前是静默把 closed 改回 0，
+        // 调用方（脚本 / 第三方 / 未来 H5 管理端）无法感知状态被改，与前端「先恢复营业」话术矛盾。
+        if (isClosed(existing)) {
+            throw new BizException(400, "该日为休整日，请先恢复营业再配置接单时段");
+        }
         // 显式时段：空数组合法（不接单）；非空则走统一规则校验
         List<String> wanted = request.slots().isEmpty()
                 ? List.of()
@@ -186,14 +191,14 @@ public class ScheduleService {
                 .sorted()
                 .toList();
         if (!missing.isEmpty()) {
-            if (existing.getClosed() != null && existing.getClosed() == 1) {
+            if (isClosed(existing)) {
                 throw new BizException(400, "该日已设为休整日但仍有订单占用时段，请先处理订单再修改档期");
             }
             List<String> merged = mergeKeepingBooked(defaults, booked);
             dayRepository.upsertDay(date, 0, toJson(merged), note);
             return new SaveSlotsResult(date.format(DATE_FMT), merged, blockedOf(booked, defaults));
         }
-        boolean closed = existing.getClosed() != null && existing.getClosed() == 1;
+        boolean closed = isClosed(existing);
         if (existing.getId() == null) {
             // 从未配置过的日期：只有带说明时才需要建行，否则保持「沿用默认」不建行
             if (!note.isEmpty()) {
@@ -209,7 +214,12 @@ public class ScheduleService {
         return new SaveSlotsResult(date.format(DATE_FMT), closed ? List.of() : defaults, List.of());
     }
 
-    /** 设置 / 取消休整日 */
+    /**
+     * 设置 / 取消休整日。
+     *
+     * <p>已有订单的日子不允许停工：休整日 slots 为空、limit=0，H5 查不到任何可约时段，
+     * 已付款订单会变成「休整日里的订单」，执行端与客户感知都会炸。存量订单需先走改期 / 退款。
+     */
     public void setClosed(LocalDate date, DayClosedRequest request) {
         requireAdmin();
         if (request == null || request.closed() == null) {
@@ -217,11 +227,22 @@ public class ScheduleService {
         }
         ScheduleDay existing = dayRepository.findByDate(date).orElseGet(() -> newDay(date));
         int closed = request.closed() ? 1 : 0;
+        if (closed == 1) {
+            int booked = dayRepository.countBookedDay(date);
+            if (booked > 0) {
+                throw new BizException(400, "该日已有 " + booked + " 单订单，不能设为休整日");
+            }
+        }
         String note = request.note() != null ? request.note().trim() : existing.getNote();
         dayRepository.upsertDay(date, closed, existing.getSlots(), note);
     }
 
     /* ═══════════════════ 内部装配 ═══════════════════ */
+
+    /** 该日是否休整日（无覆盖行视为正常营业） */
+    private boolean isClosed(ScheduleDay day) {
+        return day.getClosed() != null && day.getClosed() == 1;
+    }
 
     /** 该日各时段的有效订单数（slot → 订单数），口径同 countBookedSlot */
     private Map<String, Integer> bookedCounts(LocalDate date) {
