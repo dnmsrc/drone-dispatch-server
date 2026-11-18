@@ -23,7 +23,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,8 @@ public class ScheduleService {
     private static final int MIN_WINDOW = 7;
     private static final int MAX_WINDOW = 365;
     private static final int DEFAULT_WINDOW = 60;
+    /** 单次查询区间跨度上限：月视图 31 天够用，季/年视图由调用方分片，同时挡住超量查询 */
+    private static final int MAX_RANGE_DAYS = 62;
     /** 全局默认时段缺省值（sys_config 未配置时兜底） */
     private static final List<String> DEFAULT_SLOTS = List.of("19:00-20:00", "20:00-21:00", "21:00-22:00");
 
@@ -89,29 +93,54 @@ public class ScheduleService {
 
     /* ═══════════════════ 月历 / 单日视图 ═══════════════════ */
 
-    /** 装配 [from, to] 每天的档期单元格（含 openSlots 派生） */
+    /** 装配 [from, to] 每天的档期单元格（含 openSlots 派生），区间跨度受限 */
     public ScheduleMonthVO getMonth(LocalDate from, LocalDate to) {
-        if (from == null || to == null || from.isAfter(to)) {
-            throw new BizException(400, "日期区间非法");
-        }
+        validateRange(from, to);
         List<String> defaultSlots = readDefaultSlots();
         Map<LocalDate, ScheduleDay> overrides = new LinkedHashMap<>();
         for (ScheduleDay day : dayRepository.findBetween(from, to)) {
             overrides.put(day.getScheduleDate(), day);
         }
+        // 一次聚合拿到区间内全部已订数，避免逐日逐时段 N+1 查询（31 天 × 3 段 = 93 条 SQL）
+        Map<LocalDate, Map<String, Integer>> bookedByDate = new HashMap<>();
+        for (ScheduleDayRepository.BookedSlotCount c : dayRepository.listBookedCounts(from, to)) {
+            bookedByDate.computeIfAbsent(c.date(), k -> new LinkedHashMap<>()).put(c.slot(), c.count());
+        }
 
         List<ScheduleCellVO> cells = new ArrayList<>();
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
-            cells.add(buildCell(d, overrides.get(d), defaultSlots));
+            cells.add(buildCell(d, overrides.get(d), defaultSlots,
+                    bookedByDate.getOrDefault(d, Map.of())));
         }
         return new ScheduleMonthVO(cells, defaultSlots, readBookingWindow());
+    }
+
+    /**
+     * H5 匿名只读区间：只允许今天起、预约窗口内的档期。
+     * 防止匿名调用方拉超长区间（@public 无鉴权，不限区间等于公开的数据库放大器）。
+     */
+    public ScheduleMonthVO getPublicMonth(LocalDate from, LocalDate to) {
+        validateRange(from, to);
+        LocalDate today = LocalDate.now();
+        int window = readBookingWindow();
+        if (from.isBefore(today)) {
+            throw new BizException(400, "只能查询今天及以后的档期");
+        }
+        if (to.isAfter(today.plusDays(window))) {
+            throw new BizException(400, "只能查询未来 " + window + " 天内的档期");
+        }
+        return getMonth(from, to);
     }
 
     /** 单日视图（H5 下单选时段用），含 openSlots */
     public ScheduleCellVO getDay(LocalDate date) {
         List<String> defaultSlots = readDefaultSlots();
         ScheduleDay override = dayRepository.findByDate(date).orElse(null);
-        return buildCell(date, override, defaultSlots);
+        Map<String, Integer> booked = new HashMap<>();
+        for (ScheduleDayRepository.BookedSlotCount c : dayRepository.listBookedCounts(date, date)) {
+            booked.put(c.slot(), c.count());
+        }
+        return buildCell(date, override, defaultSlots, booked);
     }
 
     /* ═══════════════════ 单日写操作（仅 ADMIN）═══════════════════ */
@@ -160,8 +189,19 @@ public class ScheduleService {
 
     /* ═══════════════════ 内部装配 ═══════════════════ */
 
+    /** 区间合法性：顺序正确且跨度不超过上限（超长区间 = 超量查询，直接 400 挡在入口） */
+    private void validateRange(LocalDate from, LocalDate to) {
+        if (from == null || to == null || from.isAfter(to)) {
+            throw new BizException(400, "日期区间非法");
+        }
+        if (ChronoUnit.DAYS.between(from, to) > MAX_RANGE_DAYS) {
+            throw new BizException(400, "查询区间跨度过长，最多 " + MAX_RANGE_DAYS + " 天");
+        }
+    }
+
     /** 组装单日单元格：决定 slots、closed，再服务端派生 bookedSlots / openSlots / limit */
-    private ScheduleCellVO buildCell(LocalDate date, ScheduleDay override, List<String> defaultSlots) {
+    private ScheduleCellVO buildCell(LocalDate date, ScheduleDay override, List<String> defaultSlots,
+                                     Map<String, Integer> bookedCounts) {
         boolean closed = override != null && override.getClosed() != null && override.getClosed() == 1;
         boolean slotsOverridden = override != null && override.getSlots() != null;
 
@@ -176,11 +216,11 @@ public class ScheduleService {
             slots = defaultSlots;
         }
 
-        // 服务端统计每个时段已订数，并派生可预约时段（订满 ≥1 即过滤，一个时段一个名额）
+        // 已订数由调用方一次聚合传入（不再逐时段查库），派生出可预约时段（订满 ≥1 即过滤，一个时段一个名额）
         Map<String, Integer> bookedSlots = new LinkedHashMap<>();
         List<String> openSlots = new ArrayList<>();
         for (String slot : slots) {
-            int booked = dayRepository.countBookedSlot(date, slot);
+            int booked = bookedCounts.getOrDefault(slot, 0);
             bookedSlots.put(slot, booked);
             if (booked < 1) {
                 openSlots.add(slot);

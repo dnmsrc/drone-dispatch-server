@@ -71,4 +71,35 @@ public class ScheduleDayRepository {
         Integer n = jdbcTemplate.queryForObject(sql, Integer.class, date, timeSlot);
         return n == null ? 0 : n;
     }
+
+    /**
+     * 一次聚合统计区间内「每个日期 × 每个时段」的有效订单数。
+     * 替代逐日逐段调用 {@link #countBookedSlot}（默认 3 时段 31 天 = 93 条 SQL）。
+     * 走 idx_orders_perform，口径与 countBookedSlot 完全一致。
+     */
+    public List<BookedSlotCount> listBookedCounts(LocalDate from, LocalDate to) {
+        String sql = "SELECT perform_date, time_slot, COUNT(*) AS cnt FROM orders "
+                + "WHERE perform_date BETWEEN ? AND ? AND deleted = 0 "
+                + "AND status NOT IN ('CANCELLED', 'REFUNDED') "
+                + "GROUP BY perform_date, time_slot ORDER BY perform_date, time_slot";
+        return jdbcTemplate.query(sql,
+                (rs, rowNum) -> new BookedSlotCount(
+                        rs.getObject("perform_date", LocalDate.class),
+                        rs.getString("time_slot"),
+                        rs.getInt("cnt")),
+                from, to);
+    }
+
+    /** 统计某日有效订单总数（设休整日前的拦截判定用，口径同上） */
+    public int countBookedDay(LocalDate date) {
+        String sql = "SELECT COUNT(*) FROM orders "
+                + "WHERE perform_date = ? AND deleted = 0 "
+                + "AND status NOT IN ('CANCELLED', 'REFUNDED')";
+        Integer n = jdbcTemplate.queryForObject(sql, Integer.class, date);
+        return n == null ? 0 : n;
+    }
+
+    /** 聚合结果行：某日某时段的有效订单数 */
+    public record BookedSlotCount(LocalDate date, String slot, int count) {
+    }
 }

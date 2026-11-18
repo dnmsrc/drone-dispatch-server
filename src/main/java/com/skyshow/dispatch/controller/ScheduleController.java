@@ -83,11 +83,11 @@ public class ScheduleController {
 
     /* ═══════════════════ H5：匿名只读 ═══════════════════ */
 
-    /** ⑦ H5 拉取区间档期（from/to 为 YYYY-MM-DD），只暴露派生后的可预约信息 */
+    /** ⑦ H5 拉取区间档期（from/to 为 YYYY-MM-DD），只暴露派生后的可预约信息，限今天起 + 预约窗口内 */
     @GetMapping("/public")
     public Result<ScheduleMonthVO> publicMonth(@RequestParam String from,
                                                @RequestParam String to) {
-        return Result.success(
-                scheduleService.getMonth(ScheduleService.parseDate(from), ScheduleService.parseDate(to)));
+        return Result.success(scheduleService.getPublicMonth(
+                ScheduleService.parseDate(from), ScheduleService.parseDate(to)));
     }
 }
