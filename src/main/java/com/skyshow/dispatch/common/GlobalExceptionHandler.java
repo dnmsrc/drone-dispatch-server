@@ -3,9 +3,11 @@ package com.skyshow.dispatch.common;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
  * 全局异常处理：所有 controller 抛出的异常都在这被接住，统一装进 Result 信封
@@ -27,6 +29,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UnauthorizedException.class)
     public Result<Void> handleUnauthorized(UnauthorizedException e) {
         return Result.error(401, e.getMessage());
+    }
+
+    // 请求参数问题：缺参 / 类型不符（如 year=abc）属于调用方错误，返回 400 而不是兜底 500
+    @ExceptionHandler({MissingServletRequestParameterException.class,
+            MethodArgumentTypeMismatchException.class})
+    public Result<Void> handleBadRequest(Exception e) {
+        return Result.error(400, "请求参数缺失或格式错误");
     }
 
     // 兜底：所有没预料到的异常（如数据库连不上），统一 500；完整堆栈落日志便于排查

@@ -1,5 +1,6 @@
 package com.skyshow.dispatch.controller;
 
+import com.skyshow.dispatch.common.BizException;
 import com.skyshow.dispatch.common.Result;
 import com.skyshow.dispatch.dto.schedule.DayClosedRequest;
 import com.skyshow.dispatch.dto.schedule.DaySlotsRequest;
@@ -54,6 +55,13 @@ public class ScheduleController {
     /** ③ 按月（或区间）查日历，含 openSlots 派生，登录即可 */
     @GetMapping("/month")
     public Result<ScheduleMonthVO> month(@RequestParam int year, @RequestParam int month) {
+        // 非法年月直接 400；否则 LocalDate.of 抛 DateTimeException 会被兜底成 500「系统繁忙」
+        if (month < 1 || month > 12) {
+            throw new BizException(400, "月份需在 1-12 之间");
+        }
+        if (year < 1970 || year > 2200) {
+            throw new BizException(400, "年份需在 1970-2200 之间");
+        }
         LocalDate from = LocalDate.of(year, month, 1);
         LocalDate to = from.withDayOfMonth(from.lengthOfMonth());
         return Result.success(scheduleService.getMonth(from, to));
